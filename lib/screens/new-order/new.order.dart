@@ -1,6 +1,10 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '/services/api_service.dart';
+import '/widgets/order_form_helpers.dart';
 
 class NewOrder extends StatefulWidget {
   const NewOrder({super.key});
@@ -14,14 +18,27 @@ class _NewOrderState extends State<NewOrder> {
   String? selectedBrand;
   String? selectedYear;
   String? selectedMileage;
+  bool orderCreated = false;
 
-  final TextEditingController problemController = TextEditingController();
+  final firstNameController = TextEditingController();
+  final lastNameController = TextEditingController();
+  final problemController = TextEditingController();
+  final modelController = TextEditingController();
+  final plateController = TextEditingController();
 
+  final resourceNameController = TextEditingController();
+  final resourceQtyController = TextEditingController(text: "1");
+  final resourcePriceController = TextEditingController();
+
+  final List<Map<String, dynamic>> resources = [];
   final ImagePicker _picker = ImagePicker();
   final List<File> images = [];
 
+  bool isLoading = false;
+  bool submitted = false; // ⭐ steuert Pflichtfeld-Anzeige
+
   // ---------------- DATA ----------------
-  final List<String> carBrands = [
+  static const List<String> carBrands = [
     "Audi",
     "BMW",
     "Mercedes-Benz",
@@ -57,13 +74,32 @@ class _NewOrderState extends State<NewOrder> {
   ];
 
   bool get isFormValid =>
+      firstNameController.text.trim().isNotEmpty &&
+      lastNameController.text.trim().isNotEmpty &&
       selectedBrand != null &&
       selectedYear != null &&
+      modelController.text.trim().isNotEmpty &&
+      plateController.text.trim().isNotEmpty &&
       problemController.text.trim().isNotEmpty;
+
+  // ---------------- LIFECYCLE ----------------
+  @override
+  void dispose() {
+    firstNameController.dispose();
+    lastNameController.dispose();
+    problemController.dispose();
+    modelController.dispose();
+    plateController.dispose();
+
+    resourceNameController.dispose();
+    resourceQtyController.dispose();
+
+    super.dispose();
+  }
 
   // ---------------- IMAGE PICKER ----------------
   Future<void> pickFromGallery() async {
-    final XFile? file = await _picker.pickImage(
+    final file = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
     );
@@ -73,8 +109,70 @@ class _NewOrderState extends State<NewOrder> {
     }
   }
 
-  void removeImage(int index) {
-    setState(() => images.removeAt(index));
+  void addResource() {
+    if (resourceNameController.text.trim().isEmpty) return;
+
+    setState(() {
+      resources.add({
+        "name": resourceNameController.text.trim(),
+        "quantity": int.tryParse(resourceQtyController.text) ?? 1,
+        "price":
+            double.tryParse(
+              resourcePriceController.text.replaceAll(',', '.'),
+            ) ??
+            0.0,
+      });
+
+      resourceNameController.clear();
+      resourceQtyController.text = "1";
+      resourcePriceController.clear();
+    });
+  }
+
+  // ---------------- API ----------------
+  Future<void> createWorkOrder() async {
+    setState(() => isLoading = true);
+
+    final clientName =
+        '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+
+    final payload = {
+      "clientName": clientName,
+      "description": problemController.text.trim(),
+      "creationDate": DateTime.now().toIso8601String(),
+      "status": 0,
+      "vehicleInfo": {
+        "brand": selectedBrand,
+        "model": modelController.text.trim(),
+        "licensePlate": plateController.text.trim(),
+        "year": int.parse(selectedYear!),
+        "mileage": selectedMileage != null
+            ? int.parse(selectedMileage!.replaceAll('.', ''))
+            : 0,
+      },
+      "resources": resources,
+    };
+
+    try {
+      await ApiService().createWorkOrder(payload);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Der Auftrag wurde erfolgreich erstellt"),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Fehler beim Erstellen des Auftrags: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   // ---------------- UI ----------------
@@ -87,11 +185,11 @@ class _NewOrderState extends State<NewOrder> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, orderCreated),
         ),
         title: const Text(
           "Neuer Werkstattauftrag",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
@@ -100,160 +198,231 @@ class _NewOrderState extends State<NewOrder> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Fahrzeugdetails",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+              const Text(
+                "Kundendaten",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 24),
 
-                    // Marke + Modell
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _BrandDropdown(
-                            value: selectedBrand,
-                            items: carBrands,
-                            onChanged: (v) => setState(() => selectedBrand = v),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: _InputField(
-                            label: "Modell",
-                            hint: "z. B. Golf",
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Baujahr + Kilometer (JETZT DROPDOWNS)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _Dropdown(
-                            label: "Baujahr",
-                            value: selectedYear,
-                            items: years,
-                            hint: "Auswählen",
-                            onChanged: (v) => setState(() => selectedYear = v),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Dropdown(
-                            label: "Kilometer",
-                            value: selectedMileage,
-                            items: mileages,
-                            hint: "z. B. 40.000",
-                            onChanged: (v) =>
-                                setState(() => selectedMileage = v),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    const _InputField(
-                      label: "Kennzeichen",
-                      hint: "z. B. B-XY 123",
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      "Problembeschreibung *",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _TextArea(
-                      hint: "Beschreiben Sie das Problem im Detail",
-                      controller: problemController,
+              Row(
+                children: [
+                  Expanded(
+                    child: InputField(
+                      label: "Vorname",
+                      hint: "z. B. Max",
+                      controller: firstNameController,
+                      isRequired: true,
+                      showError: submitted,
                       onChanged: (_) => setState(() {}),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      "Fotos hinzufügen",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InputField(
+                      label: "Nachname",
+                      hint: "z. B. Mustermann",
+                      controller: lastNameController,
+                      isRequired: true,
+                      showError: submitted,
+                      onChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 8),
-
-                    _PhotoUploadBox(onPick: pickFromGallery),
-
-                    if (images.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: List.generate(images.length, (index) {
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  images[index],
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              Positioned(
-                                top: -6,
-                                right: -6,
-                                child: GestureDetector(
-                                  onTap: () => removeImage(index),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
+
+              const Text(
+                "Fahrzeugdetails",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: BrandDropdown(
+                      value: selectedBrand,
+                      items: carBrands,
+                      onChanged: (v) => setState(() => selectedBrand = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InputField(
+                      label: "Modell",
+                      hint: "z. B. Golf",
+                      controller: modelController,
+                      isRequired: true,
+                      showError: submitted,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownField(
+                      label: "Baujahr",
+                      value: selectedYear,
+                      items: years,
+                      hint: "Auswählen",
+                      isRequired: true,
+                      showError: submitted,
+                      onChanged: (v) => setState(() => selectedYear = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownField(
+                      label: "Kilometer",
+                      value: selectedMileage,
+                      items: mileages,
+                      hint: "z. B. 40.000",
+                      onChanged: (v) => setState(() => selectedMileage = v),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              InputField(
+                label: "Kennzeichen",
+                hint: "z. B. B-XY 123",
+                controller: plateController,
+                isRequired: true,
+                showError: submitted,
+                onChanged: (_) => setState(() {}),
+              ),
+
+              const SizedBox(height: 24),
+
+              const Text(
+                "Problembeschreibung *",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              TextArea(
+                hint: "Beschreiben Sie das Problem im Detail",
+                controller: problemController,
+                isRequired: true,
+                showError: submitted,
+                onChanged: (_) => setState(() {}),
+              ),
+
+              const SizedBox(height: 24),
+
+              const Text(
+                "Ressourcen",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+
+              const SizedBox(height: 16),
+              // --------------------------------------------------
+              // RESOURCE INPUT
+              // --------------------------------------------------
+              Row(
+                children: [
+                  Expanded(
+                    child: InputField(
+                      label: "Ressource",
+                      hint: "z. B. Ölfilter",
+                      controller: resourceNameController,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 70,
+                    child: InputField(
+                      label: "Menge",
+                      hint: "1",
+                      controller: resourceQtyController,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 90,
+                    child: InputField(
+                      label: "Preis €",
+                      hint: "29.90",
+                      controller: resourcePriceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: addResource,
+                  icon: const Icon(Icons.add),
+                  label: const Text("Ressource hinzufügen"),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // --------------------------------------------------
+              // RESOURCE LIST
+              // --------------------------------------------------
+              if (resources.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: resources.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final r = entry.value;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                r["name"],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text("× ${r["quantity"]}"),
+                            const SizedBox(width: 12),
+                            Text("${r["price"].toStringAsFixed(2)} €"),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () {
+                                setState(() => resources.removeAt(index));
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+              PhotoUploadBox(onPick: pickFromGallery),
+
+              const SizedBox(height: 24),
 
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: isFormValid ? () {} : null,
+                  onPressed: isFormValid && !isLoading
+                      ? createWorkOrder
+                      : () => setState(() => submitted = true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     disabledBackgroundColor: Colors.grey.shade400,
@@ -261,14 +430,23 @@ class _NewOrderState extends State<NewOrder> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
-                    "Auftrag erstellen",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          "Auftrag erstellen",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -277,169 +455,4 @@ class _NewOrderState extends State<NewOrder> {
       ),
     );
   }
-}
-
-// ------------------------------------------------------------
-// HELPERS
-// ------------------------------------------------------------
-class _Dropdown extends StatelessWidget {
-  final String label;
-  final String? value;
-  final List<String> items;
-  final String hint;
-  final ValueChanged<String?> onChanged;
-
-  const _Dropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.hint,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          value: value,
-          hint: Text(hint),
-          items: items
-              .map((i) => DropdownMenuItem(value: i, child: Text(i)))
-              .toList(),
-          onChanged: onChanged,
-          decoration: _inputDecoration(),
-        ),
-      ],
-    );
-  }
-}
-
-class _BrandDropdown extends StatelessWidget {
-  final String? value;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-
-  const _BrandDropdown({
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _Dropdown(
-      label: "Marke",
-      value: value,
-      items: items,
-      hint: "z. B. VW",
-      onChanged: onChanged,
-    );
-  }
-}
-
-class _InputField extends StatelessWidget {
-  final String label;
-  final String hint;
-
-  const _InputField({required this.label, required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 6),
-        TextField(decoration: _inputDecoration(hint)),
-      ],
-    );
-  }
-}
-
-class _TextArea extends StatelessWidget {
-  final String hint;
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  const _TextArea({
-    required this.hint,
-    required this.controller,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      maxLines: 4,
-      decoration: _inputDecoration(hint),
-    );
-  }
-}
-
-class _PhotoUploadBox extends StatelessWidget {
-  final VoidCallback onPick;
-
-  const _PhotoUploadBox({required this.onPick});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onPick,
-      child: Container(
-        height: 120,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.grey.shade50,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.photo_library, color: Colors.blue),
-            SizedBox(height: 8),
-            Text(
-              "Foto aus Galerie auswählen",
-              style: TextStyle(color: Colors.blue),
-            ),
-            SizedBox(height: 4),
-            Text(
-              "PNG, JPG (max. 5MB)",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-InputDecoration _inputDecoration([String? hint]) {
-  return InputDecoration(
-    hintText: hint,
-    filled: true,
-    fillColor: Colors.white,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.grey.shade300),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.grey.shade400),
-    ),
-  );
 }
