@@ -1,16 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:garage_app/services/api_service.dart';
+
+String statusText(int status) {
+  switch (status) {
+    case 0:
+      return "Offen";
+    case 1:
+      return "In Bearbeitung";
+    case 2:
+      return "Fertig";
+    default:
+      return "Problem";
+  }
+}
+
+Color statusColor(int status) {
+  switch (status) {
+    case 0:
+      return Colors.grey;
+    case 1:
+      return Colors.orange.shade800;
+    case 2:
+      return Colors.green;
+    default:
+      return Colors.red;
+  }
+}
+
+/// 🔹 Background-Farbe für Status-Badge
+Color statusBgColor(int status) {
+  switch (status) {
+    case 1:
+      return Colors.orange.shade100;
+    case 2:
+      return Colors.green.shade100;
+    case 0:
+      return Colors.grey.shade200;
+    default:
+      return Colors.red.shade100;
+  }
+}
 
 class TaskDetailScreen extends StatelessWidget {
   final Map<String, dynamic> job;
 
-  const TaskDetailScreen({
-    super.key,
-    required this.job,
-  });
+  const TaskDetailScreen({super.key, required this.job});
+
+  Future<void> setStatusFinished(BuildContext context) async {
+    final api = ApiService();
+    await api.updateWorkOrderStatus(job["id"], 2);
+
+    if (context.mounted) {
+      Navigator.pop(context, true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final vehicle = job["vehicleInfo"];
+
+    // 🔹 HIER ERGÄNZT (war vorher nicht vorhanden)
+    final List<dynamic> resources = job["resources"] as List<dynamic>? ?? [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
@@ -27,10 +77,7 @@ class TaskDetailScreen extends StatelessWidget {
         ),
         title: const Text(
           "Werkstattauftragsdetails",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         actions: [
@@ -68,20 +115,21 @@ class TaskDetailScreen extends StatelessWidget {
                           ),
                         ),
                         _Badge(
-                          text: "Hohe Priorität",
-                          color: Colors.orange,
+                          text: statusText(job["status"]),
+                          color: statusColor(job["status"]),
+                          backgroundColor: statusBgColor(job["status"]),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     Row(
-                      children: const [
-                        _StatusDot(color: Colors.blue),
-                        SizedBox(width: 8),
+                      children: [
+                        _StatusDot(color: statusColor(job["status"])),
+                        const SizedBox(width: 8),
                         Text(
-                          "In Bearbeitung",
+                          statusText(job["status"]),
                           style: TextStyle(
-                            color: Colors.blue,
+                            color: statusColor(job["status"]),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -92,7 +140,10 @@ class TaskDetailScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
                         _Meta(label: "Erstellt", value: "23. Dez. 2023"),
-                        _Meta(label: "Fälligkeitsdatum", value: "25. Dez. 2023"),
+                        _Meta(
+                          label: "Fälligkeitsdatum",
+                          value: "25. Dez. 2023",
+                        ),
                       ],
                     ),
                   ],
@@ -110,8 +161,10 @@ class TaskDetailScreen extends StatelessWidget {
                   children: [
                     const Text(
                       "Fahrzeugdetails",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -147,8 +200,7 @@ class TaskDetailScreen extends StatelessWidget {
                     const Divider(),
                     _InfoRow(label: "Kilometerstand", value: "85.430 km"),
                     _InfoRow(label: "Erstzulassung", value: "03/2021"),
-                    _InfoRow(
-                        label: "FIN", value: "WVWZZZAUZMP123456"),
+                    _InfoRow(label: "FIN", value: "WVWZZZAUZMP123456"),
                   ],
                 ),
               ),
@@ -156,33 +208,32 @@ class TaskDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // --------------------------------------------------
-              // RESOURCE MANAGEMENT
+              // RESOURCES
               // --------------------------------------------------
-              _Card(
-                background: Colors.blue.shade50,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Ressourcenverwaltung",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 12),
-                    const _Input(label: "Ersatzteil (Teilenummer)"),
-                    const SizedBox(height: 12),
-                    const _Input(label: "Hersteller"),
-                    const SizedBox(height: 12),
-                    const _Input(label: "Verwendete Werkzeuge"),
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.add),
-                      label: const Text("Ressource hinzufügen"),
-                    ),
-                  ],
+              if (resources.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Ressourcen",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...resources.map(
+                        (r) => _ResourceRow(
+                          name: r["name"] ?? "Unbekannt",
+                          quantity: r["quantity"] ?? 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
 
               const SizedBox(height: 16),
 
@@ -196,8 +247,10 @@ class TaskDetailScreen extends StatelessWidget {
                   children: [
                     const Text(
                       "Fotos vom Fortschritt",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -209,29 +262,6 @@ class TaskDetailScreen extends StatelessWidget {
                         _AddPhoto(),
                       ],
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // --------------------------------------------------
-              // CHECKLIST
-              // --------------------------------------------------
-              _Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      "Checkliste für Endkontrolle",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(height: 12),
-                    _CheckItem("Bremsflüssigkeit geprüft"),
-                    _CheckItem("Radmuttern mit Drehmoment angezogen"),
-                    _CheckItem("Probefahrt durchgeführt"),
-                    _CheckItem("Fahrzeug gereinigt"),
                   ],
                 ),
               ),
@@ -251,7 +281,9 @@ class TaskDetailScreen extends StatelessWidget {
         child: SizedBox(
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: null,
+            onPressed: job["status"] == 2
+                ? null
+                : () => setStatusFinished(context),
             icon: const Icon(Icons.check_circle_outline),
             label: const Text("Auftrag abschließen"),
             style: ElevatedButton.styleFrom(
@@ -302,10 +334,11 @@ class _Meta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-        Text(value,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -314,19 +347,26 @@ class _Meta extends StatelessWidget {
 class _Badge extends StatelessWidget {
   final String text;
   final Color color;
+  final Color backgroundColor;
 
-  const _Badge({required this.text, required this.color});
+  const _Badge({
+    required this.text,
+    required this.color,
+    required this.backgroundColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(text,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
@@ -366,26 +406,6 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _Input extends StatelessWidget {
-  final String label;
-  const _Input({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: "z. B. $label",
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-}
-
 class _PhotoPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -415,17 +435,35 @@ class _AddPhoto extends StatelessWidget {
   }
 }
 
-class _CheckItem extends StatelessWidget {
-  final String text;
-  const _CheckItem(this.text);
+class _ResourceRow extends StatelessWidget {
+  final String name;
+  final int quantity;
+
+  const _ResourceRow({required this.name, required this.quantity});
 
   @override
   Widget build(BuildContext context) {
-    return CheckboxListTile(
-      value: false,
-      onChanged: (_) {},
-      title: Text(text),
-      controlAffinity: ListTileControlAffinity.leading,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.build, size: 18, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            "× $quantity",
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
