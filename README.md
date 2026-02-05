@@ -1,16 +1,51 @@
-# garage_app
+# 🛠️ Garage App
 
-A new Flutter project.
+**Garage App** ist eine mobile Flutter-Anwendung zur Verwaltung von Werkstattaufträgen.  
+Sie ermöglicht das Erstellen, Bearbeiten und Nachverfolgen von Aufträgen inklusive Fahrzeugdaten, Status, Ressourcen und Preisen.
 
-## Getting Started
+Die App ist für den täglichen Einsatz in kleinen bis mittleren Auto-Werkstätten gedacht.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## ✨ Features
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- 📋 Übersicht aller Werkstattaufträge (Dashboard)
+- 🔎 Filter nach Status:
+  - Offen
+  - In Bearbeitung
+  - Fertig
+  - Problem
+- ➕ Neuen Auftrag anlegen
+- ✏️ Bestehende Aufträge bearbeiten
+- 🚗 Fahrzeugdetails (Marke, Modell, Kennzeichen, Baujahr, Kilometerstand)
+- 🧰 Ressourcenverwaltung:
+  - Ressource
+  - Menge
+  - Preis
+- 🏷️ Status-Badges mit Farblogik
+- 🔄 Pull-to-Refresh
+- 🌐 Backend-Anbindung (REST API)
+- 📱 Android-ready (APK Build)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+## 📸 Screens (optional)
+
+> Dashboard • Neuer Auftrag • Auftragsdetails • Bearbeiten * Berichte * Settings
+
+---
+
+## 🏗️ Architektur
+
+- **Frontend:** Flutter (Material Design)
+- **State:** StatefulWidgets + setState
+- **Backend:** REST API (z. B. Azure App Service)
+- **HTTP:** eigener `ApiService`
+- **Plattform:** Android (iOS optional)
+
+---
+
+## 🔌 Backend
+
+Die App kommuniziert mit einem REST-Backend.
+
