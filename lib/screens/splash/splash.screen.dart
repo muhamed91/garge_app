@@ -32,9 +32,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _goNext() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainTabs()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const MainTabs()));
   }
 
   @override
@@ -66,10 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // 🔹 TITLE
             const Text(
               "WerkstattPro",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
             ),
 
             const SizedBox(height: 8),
@@ -77,10 +74,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // 🔹 SUBTITLE
             Text(
               "Workshop Management, Simplified.",
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
 
             const Spacer(flex: 2),
@@ -94,8 +88,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   value: progress,
                   minHeight: 6,
                   backgroundColor: Colors.grey.shade200,
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(Colors.blue),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
                 ),
               ),
             ),
@@ -103,10 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 12),
 
             // 🔹 LOADING TEXT
-            Text(
-              "Laden...",
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
+            Text("Laden...", style: TextStyle(color: Colors.grey.shade600)),
 
             const Spacer(flex: 2),
           ],
