@@ -16,8 +16,8 @@ class _MainTabsState extends State<MainTabs> {
 
   final screens = const [
     Dashboard(), // 0
-    Reports(),   // 1
-    Settings(),  // 2
+    Reports(), // 1
+    Settings(), // 2
   ];
 
   @override
@@ -25,36 +25,22 @@ class _MainTabsState extends State<MainTabs> {
     return Scaffold(
       body: screens[index],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _navIndexFromScreenIndex(index),
+        currentIndex: index,
+        onTap: (i) {
+          setState(() => index = i);
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primaryBlue,
         unselectedItemColor: Colors.grey,
         backgroundColor: AppColors.background,
-        onTap: (navIndex) {
-          // ➕ NEW ORDER (modal, not a tab)
-          if (navIndex == 1) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NewOrder()),
-            );
-            return;
-          }
-
-          setState(() {
-            index = _screenIndexFromNavIndex(navIndex);
-          });
-        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
             label: "Dashboard",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: "New Order",
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
-            label: "Reports",
+            label: "Berichte",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
@@ -63,19 +49,5 @@ class _MainTabsState extends State<MainTabs> {
         ],
       ),
     );
-  }
-
-  // -----------------------------
-  // INDEX MAPPING (THE FIX)
-  // -----------------------------
-
-  int _screenIndexFromNavIndex(int navIndex) {
-    if (navIndex < 1) return navIndex;
-    return navIndex - 1;
-  }
-
-  int _navIndexFromScreenIndex(int screenIndex) {
-    if (screenIndex < 1) return screenIndex;
-    return screenIndex + 1;
   }
 }
